@@ -9,7 +9,6 @@ from galaxyParametersDictionary_v6 import *
 
 # V.2 uses the new R fields kriging routines
 # V.3 has some new functions for the new error estimation
-# V.4 map pixel size is modifiable
 
 '''
 Functions
@@ -55,20 +54,9 @@ def bootstrapRealization(genTable, pathOutput, realization): #Input is table to 
   fileTMP.close()
   return True
 
-def extractAsymmGaussianProb(medianVal, sigmaNeg, sigmaPos): # Picks a value from two broken Gaussians distribution.
-  import random
-  # pick if negative or positive gaussian
-  side = sign(random.getrandbits(1)-0.5)
-  #
-  if side <0:
-    valueOut = medianVal-numpy.abs(numpy.random.normal(scale=sigmaNeg))
-  else:
-    valueOut = medianVal+numpy.abs(numpy.random.normal(scale=sigmaPos))
-  return valueOut
-
-def MCextraction(genTable, pathOutput, realization, realErrors=[]): #Create a list of points with the same spatial positions but values within the error range.
-# The Gaussian from which the new values are extracted has a sigma = to the actual error. In the case of [Z/H], where the errors are asymmetric, the probability distribution from which the values are extracted is made by two normalized half Gaussians.
-# In case of S/N, this doesn't work (no errors on S/N).
+def MCextraction(genTable, pathOutput, realization): #Create a list of points with the same spatial positions but values within the error range.
+# The Gaussian from which the new values are extracted has a sigma = to the actual error (in a future expansion, it will reflect the actual asymmetry of the input uncertainties).
+# In case of S/N, this doesn't work.
   import random
   # Create list with as many rows as the number of input points
   lines = []
@@ -80,14 +68,8 @@ def MCextraction(genTable, pathOutput, realization, realErrors=[]): #Create a li
   newList = []
   for jj in numpy.arange(len(lines)):
     random.seed()
-    if realErrors: #Asymmetric errors
-      realValue = lines[jj][2]
-      sigmaErr_neg, sigmaErr_pos = realErrors[0][jj], realErrors[1][jj]
-      newValue = extractAsymmGaussianProb(realValue, sigmaErr_neg, sigmaErr_pos)
-      sigmaErr = numpy.sqrt(sigmaErr_neg**2.+sigmaErr_pos**2.)
-    else:
-      realValue, sigmaErr = lines[jj][2], lines[jj][3]
-      newValue = numpy.random.normal(loc=realValue, scale=sigmaErr)
+    realValue, sigmaErr = lines[jj][2], lines[jj][3]
+    newValue = numpy.random.normal(loc=realValue, scale=sigmaErr)
     newList.append([lines[jj][0],lines[jj][1], newValue, sigmaErr])
 #
   newList = numpy.array(newList)
@@ -107,7 +89,7 @@ def MCextraction(genTable, pathOutput, realization, realErrors=[]): #Create a li
 #Run kriging interpolation in R
 def KrigingR(pathInput, theta_r = 10., coeff_r = 3.,
              visualize = False, savePdf = False, verbose = False,
-             pathOutput = 'Outputs/', label='', full=False, sizePixelMap=80):
+             pathOutput = 'Outputs/', label='', full=False):
 #
   r = robjects.r
   r.library('fields')
@@ -142,7 +124,8 @@ def KrigingR(pathInput, theta_r = 10., coeff_r = 3.,
   #
   if label != 'SN':
     zerr_r = robjects.r('''zerr <- filetab[selection, "V4"]''')
-    ww_r = robjects.r('''ww <- ((1./(zerr^2.))/max(1./(zerr^2.)))''')
+#    ww_r = robjects.r('''ww <- ((1./(zerr^2.))/max(1./(zerr^2.)))''')
+    ww_r = robjects.r('''ww <- (1./(zerr^2.))''')
 # Creation Position Matrix
   X_r = robjects.r('''X <- data.matrix(data.frame(x,y))''')
 #
@@ -224,37 +207,34 @@ def KrigingR(pathInput, theta_r = 10., coeff_r = 3.,
   import platform
   posOutput_surface = 3 #Works only with the old version of 'predict'
   if platform.system() == 'Linux':  #On G2 there is a newer version of fields
-    look_r = robjects.r(''' look<-predictSurface(fit,
-          nx = '''+str(int(sizePixelMap))+''', ny = '''+str(int(sizePixelMap))+''') ''')
+    look_r = robjects.r(''' look<-predictSurface(fit) ''')
 #standardErrorsGrid <- c(predict.se(fit,gridK)) #On a grid
     standardErrorsGrid_r = robjects.r(''' standardErrorsGrid <-
-                                    c(predictSurfaceSE(fit,
-          nx = '''+str(int(sizePixelMap))+''', ny = '''+str(int(sizePixelMap))+''')) ''')
+                                    c(predictSurfaceSE(fit)) ''')
   else:
     try:
       if full:
-        look_r = robjects.r(''' look<-predict.surface(fit, extrap=TRUE,
-          nx = '''+str(int(sizePixelMap))+''', ny = '''+str(int(sizePixelMap))+''') ''')
+        look_r = robjects.r(''' look<-predict.surface(fit, extrap=TRUE) ''')
 #standardErrorsGrid <- c(predict.se(fit,gridK)) #On a grid
         standardErrorsGrid_r = robjects.r(''' standardErrorsGrid <-
-                                    c(predict.surface.se(fit, extrap=TRUE, nx = '''+str(int(sizePixelMap))+''', ny = '''+str(int(sizePixelMap))+''')) ''')
+                                    c(predict.surface.se(fit, extrap=TRUE)) ''')
       else:
-        look_r = robjects.r(''' look<-predict.surface(fit, nx = '''+str(int(sizePixelMap))+''', ny = '''+str(int(sizePixelMap))+''') ''')
+        look_r = robjects.r(''' look<-predict.surface(fit) ''')
 #standardErrorsGrid <- c(predict.se(fit,gridK)) #On a grid
         standardErrorsGrid_r = robjects.r(''' standardErrorsGrid <-
-                                    c(predict.surface.se(fit, nx = '''+str(int(sizePixelMap))+''', ny = '''+str(int(sizePixelMap))+''') ''')
+                                    c(predict.surface.se(fit)) ''')
     except: #New version of 'fields' (R package)
       posOutput_surface = 8
       if full:
-        look_r = robjects.r(''' look<-predictSurface(fit, extrap=TRUE, nx = '''+str(int(sizePixelMap))+''', ny = '''+str(int(sizePixelMap))+''') ''')
+        look_r = robjects.r(''' look<-predictSurface(fit, extrap=TRUE) ''')
 #standardErrorsGrid <- c(predict.se(fit,gridK)) #On a grid
         standardErrorsGrid_r = robjects.r(''' standardErrorsGrid <-
-                                    c(predictSurfaceSE(fit, extrap=TRUE, nx = '''+str(int(sizePixelMap))+''', ny = '''+str(int(sizePixelMap))+''')) ''')
+                                    c(predictSurfaceSE(fit, extrap=TRUE)) ''')
       else:
-        look_r = robjects.r(''' look<-predictSurface(fit, nx = '''+str(int(sizePixelMap))+''', ny = '''+str(int(sizePixelMap))+''') ''')
+        look_r = robjects.r(''' look<-predictSurface(fit) ''')
 #standardErrorsGrid <- c(predict.se(fit,gridK)) #On a grid
         standardErrorsGrid_r = robjects.r(''' standardErrorsGrid <-
-                                    c(predictSurfaceSE(fit, nx = '''+str(int(sizePixelMap))+''', ny = '''+str(int(sizePixelMap))+''')) ''')
+                                    c(predictSurfaceSE(fit)) ''')
   gridK_r = robjects.r(''' gridK <- expand.grid(look$x, look$y) ''')
 #  linearZ_r = robjects.r(''' linearZ <- expand.grid(look[3]) ''')
   linearZ_r = robjects.r(''' linearZ <- expand.grid(look['''+str(int(posOutput_surface))+''']) ''')
@@ -297,7 +277,7 @@ def getMedianDistance(xx, yy): #returns the median distance between the points
   return numpy.median(distances)
 
 
-def KrigingMapPython(inputPath, namegal, genTable, label='Z', limits=[-3, +2], visualize=False, sizePixelMap=80):
+def KrigingMapPython(inputPath, namegal, genTable, label='Z', limits=[-3, +2], visualize=False):
   #Retrieving galaxy parameters' dictionary
   #Creating the Kriging maps with Python
   #reading input file
@@ -318,11 +298,10 @@ def KrigingMapPython(inputPath, namegal, genTable, label='Z', limits=[-3, +2], v
         errzK.append(nan)
   #
   #reshaping
-  xK = numpy.array(xK).reshape(sizePixelMap,sizePixelMap)
-  yK = numpy.array(yK).reshape(sizePixelMap,sizePixelMap)
-  zK = numpy.array(zK).reshape(sizePixelMap,sizePixelMap)
-  errzK = numpy.array(errzK).reshape(sizePixelMap,sizePixelMap)
-
+  xK = numpy.array(xK).reshape(80,80)
+  yK = numpy.array(yK).reshape(80,80)
+  zK = numpy.array(zK).reshape(80,80)
+  errzK = numpy.array(errzK).reshape(80,80)
   #
   minZpoints, maxZpoints = numpy.min(genTable[:,2]),  numpy.max(genTable[:,2])
   rangeZmap = [numpy.max([numpy.min([minZpoints, minZmap]), limits[0]]),
@@ -493,6 +472,8 @@ def radialProfileLog(namegal, inputFile, label='Z', #binsize=50,  #Bin numerosit
   return binR, binZ, bineZ
 
 
+
+
 def extractStdBin(prof_R, totRealizations, listReal_R, listReal_val):
   prof_errp, prof_errm, prof_median, n_elements = [], [], [], []
   for jj in numpy.arange(len(prof_R)):
@@ -531,7 +512,7 @@ def extractStdBin(prof_R, totRealizations, listReal_R, listReal_val):
 
 # For both linear and logarithmic profiles, errors using bootstrapping on the datapoints (if mode = bootstrapping).
 # Or, for both the linear and log profiles, errors using MC simulation (if mode = MC)
-def MCerrors(linear_prof_R, log_prof_R, totRealizations, namegal, genTable, rangeKriging, label='Z', mode='BS', sizePixelMap=80., realErrors = []):
+def MCerrors(linear_prof_R, log_prof_R, totRealizations, namegal, genTable, rangeKriging, label='Z', mode='BS'):
   #
   ## create realizations
   list_R_lin, list_Val_lin = [], []
@@ -548,11 +529,11 @@ def MCerrors(linear_prof_R, log_prof_R, totRealizations, namegal, genTable, rang
       #
       dummy = bootstrapRealization(genTable, pathNick+namegal+'/Kriging/'+mode+'_'+label, jj)
     elif mode == 'MC':
-      dummy = MCextraction(genTable, pathNick+namegal+'/Kriging/'+mode+'_'+label, jj, realErrors=realErrors)
+      dummy = MCextraction(genTable, pathNick+namegal+'/Kriging/'+mode+'_'+label, jj)
 
     dummy = KrigingR(pathNick+namegal+'/Kriging/'+mode+'_'+label+'/'+mode+str(jj)+'/realization_'+str(jj)+'_Points.txt', visualize=False,
          theta_r = int(rangeKriging), coeff_r = 3, savePdf = False,
-         pathOutput = pathNick+namegal+'/Kriging/'+mode+'_'+label+'/'+mode+str(jj)+'/', label=label, sizePixelMap=80.)
+         pathOutput = pathNick+namegal+'/Kriging/'+mode+'_'+label+'/'+mode+str(jj)+'/', label=label)
 
   ## extract profiles
   ### LINEAR

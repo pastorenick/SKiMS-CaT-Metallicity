@@ -81,16 +81,22 @@ from KrigingMapping_def_v4 import *
 #       simulation approach.
 #       In the first case it draw from the data point sample with
 #       replacement, in the second it creates maps with the same points
-#       but values within their errorbars (homogeneously distributed).
+#       but values within their errorbars (homogeneously distributed for all
+#       the parameters but [Z/H]).
 #       Such errors are then summed in quadrature (ie overestimated) between
 #       them and with the dispersion of values within the same radial bin
 #       when azimuthally averaged.
 #
 #       In the Monte Carlo case, the values on the single points are extracted
-#       from a Gaussian that has a sigma equal to the average error. In a
-#       future version I plan to create a split Gaussian, with different left
-#       and right dispersions. Obviously, this error component is not computed
-#       for the S/N maps (S/N data points don't have an error associated).
+#       from a Gaussian that has a sigma equal to the average error for all the
+#       parameters but [Z/H] and S/N.
+#       In the case of [Z/H], the values are extracted from an approximation
+#       of the real probability distribution built as two half Gaussians
+#       connected at the mediam value and with dispersions equal to the
+#       negative and positive [Z/H] error, respectively. The two half
+#       half-Gaussians have the same area (ie the same total probability).
+#       For the S/N maps the error component is not computed because this
+#       parameter doesn't have an error associated).
 #
 #       The uncertainty on the final radial profiles contains the sum in
 #       quadrature of these two error components plus (still in quadrature) the
@@ -121,8 +127,7 @@ __builtins__.forcing = args.forcing
 __builtins__.thetaFromDic = not(args.theta) #Instead of measuring the average distance between the points,
                     # it takes the theta from the dictionary
 __builtins__.pathNick = './'
-__builtins__.savePDF = True #In queue it doesn't work
-
+__builtins__.savePDF = True
 
 # Main
 
@@ -218,6 +223,7 @@ for ii in listGalaxiesToRun:
     #
   elif (mode == "Z") | (mode == "all"):
     errZ = numpy.sqrt(numpy.array(errpZ)**2.+numpy.array(errmZ)**2.)
+    errpZ_sel, errmZ_sel = numpy.array(errpZ)[selCheck], numpy.array(errmZ)[selCheck]
     genTable_Z = transpose(numpy.array([numpy.array(RA)[selCheck], numpy.array(Dec)[selCheck],
              numpy.array(Z_corr)[selCheck], errZ[selCheck]]))
     #
@@ -270,8 +276,11 @@ for ii in listGalaxiesToRun:
          pathOutput = './'+ii+'/Kriging/', label='CaT')
     if verbose: print "\t CaT Kriging map done!"
     # Create Kriging map with Python
-    dummy = KrigingMapPython('./'+ii+'/Kriging/', ii, genTable_CaT, label='CaT',
+    try:
+      dummy = KrigingMapPython('./'+ii+'/Kriging/', ii, genTable_CaT, label='CaT',
                             limits = [3., +8]) #For the visualization
+    except:
+      print "Not able to create map for "+ii
   #
   elif (mode == "SN") | (mode == "all"):
     dummy = KrigingR('./'+ii+'/Kriging/listElements_SN.txt', visualize=False,
@@ -279,8 +288,11 @@ for ii in listGalaxiesToRun:
          pathOutput = './'+ii+'/Kriging/', label='SN')
     if verbose: print "\t S/N Kriging map done!"
     #
-    dummy = KrigingMapPython('./'+ii+'/Kriging/', ii, genTable_SN, label='SN',
+    try:
+      dummy = KrigingMapPython('./'+ii+'/Kriging/', ii, genTable_SN, label='SN',
                             limits = [35., 100]) #For the visualization
+    except:
+      print "Not able to create map for "+ii
   #
   elif (mode == "Z") | (mode == "all"):
     dummy = KrigingR('./'+ii+'/Kriging/listElements_Z.txt', visualize=False,
@@ -288,17 +300,22 @@ for ii in listGalaxiesToRun:
          pathOutput = './'+ii+'/Kriging/', label='Z')
     if verbose: print "\t Z Kriging map done!"
     #
-    dummy = KrigingMapPython('./'+ii+'/Kriging/', ii, genTable_Z, label='Z',
+    try:
+      dummy = KrigingMapPython('./'+ii+'/Kriging/', ii, genTable_Z, label='Z',
                          limits = [-3., +2]) #For the visualization
+    except:
+      print "Not able to create map for "+ii
   #
   elif (mode == "sigma") | (mode == "all"):
     dummy = KrigingR('./'+ii+'/Kriging/listElements_sigma.txt', visualize=False,
          theta_r = theta_sigma, coeff_r = 3, savePdf = True,
          pathOutput = './'+ii+'/Kriging/', label='sigma')
     if verbose: print "\t Sigma Kriging map done!"
-
-    dummy = KrigingMapPython('./'+ii+'/Kriging/', ii, genTable_sigma, label='sigma',
+    try:
+      dummy = KrigingMapPython('./'+ii+'/Kriging/', ii, genTable_sigma, label='sigma',
                             limits = [0, 250]) #For the visualization
+    except:
+      print "Not able to create map for "+ii
 
 
 # '''
@@ -308,12 +325,15 @@ for ii in listGalaxiesToRun:
   if (mode == "CaT") | (mode == "all"):
     linear_prof_RCaT, linear_prof_CaT, std_prof_lin_CaT = radialProfileLin(ii, './'+ii+'/Kriging/gridKrig_CaT.txt', label='CaT', datapoints = genTable_CaT)
     log_prof_RCaT, log_prof_CaT, std_prof_log_CaT = radialProfileLog(ii, './'+ii+'/Kriging/gridKrig_CaT.txt', label='CaT', datapoints = genTable_CaT)
+
   elif (mode == "SN") | (mode == "all"):
     linear_prof_RSN, linear_prof_SN, std_prof_lin_SN = radialProfileLin(ii, './'+ii+'/Kriging/gridKrig_SN.txt', label='SN', datapoints = genTable_SN)
     log_prof_RSN, log_prof_SN, std_prof_log_SN = radialProfileLog(ii, './'+ii+'/Kriging/gridKrig_SN.txt', label='SN', datapoints = genTable_SN)
+
   elif (mode == "Z") | (mode == "all"):
     linear_prof_RZ, linear_prof_Z, std_prof_lin_Z = radialProfileLin(ii, './'+ii+'/Kriging/gridKrig_Z.txt', label='Z', datapoints = genTable_Z)
     log_prof_RZ, log_prof_Z, std_prof_log_Z = radialProfileLog(ii, './'+ii+'/Kriging/gridKrig_Z.txt', label='Z', datapoints = genTable_Z)
+
   elif (mode == "sigma") | (mode == "all"):
      linear_prof_Rsigma, linear_prof_sigma, std_prof_lin_sigma = radialProfileLin(ii, './'+ii+'/Kriging/gridKrig_sigma.txt', label='sigma', datapoints = genTable_sigma)
      log_prof_Rsigma, log_prof_sigma, std_prof_log_sigma = radialProfileLog(ii, './'+ii+'/Kriging/gridKrig_sigma.txt', label='sigma', datapoints = genTable_sigma)
@@ -325,35 +345,39 @@ for ii in listGalaxiesToRun:
   totRealizations = 1000
   if (mode == "CaT") | (mode == "all"):
     print "\nFinding BS errors for CaT map"
+    genTable_CaT_BS = genTable_CaT.copy()
     (BS_radial_lin_errm_CaT, BS_radial_lin_errp_CaT,
       BS_radial_lin_median_CaT, BS_n_elements_lin_CaT,
       BS_radial_log_errm_CaT, BS_radial_log_errp_CaT,
       BS_radial_log_median_CaT, BS_n_elements_log_CaT) = MCerrors(linear_prof_RCaT, log_prof_RCaT,
-              totRealizations, ii, genTable_CaT, theta_CaT, label='CaT', mode='BS')
+              totRealizations, ii, genTable_CaT_BS, theta_CaT, label='CaT', mode='BS')
   #
   elif (mode == "SN") | (mode == "all"):
     print "\nFinding BS errors for S/N map"
+    genTable_SN_BS = genTable_SN.copy()
     (BS_radial_lin_errm_SN, BS_radial_lin_errp_SN,
       BS_radial_lin_median_SN, BS_n_elements_lin_SN,
       BS_radial_log_errm_SN, BS_radial_log_errp_SN,
       BS_radial_log_median_SN, BS_n_elements_log_SN) = MCerrors(linear_prof_RSN, log_prof_RSN,
-                              totRealizations, ii, genTable_SN, theta_SN, label='SN', mode='BS')
+                              totRealizations, ii, genTable_SN_BS, theta_SN, label='SN', mode='BS')
   #
   elif (mode == "Z") | (mode == "all"):
     print "\nFinding BS errors for [Z/H] map"
+    genTable_Z_BS = genTable_Z.copy()
     (BS_radial_lin_errm_Z, BS_radial_lin_errp_Z,
       BS_radial_lin_median_Z, BS_n_elements_lin_Z,
       BS_radial_log_errm_Z, BS_radial_log_errp_Z,
       BS_radial_log_median_Z, BS_n_elements_log_Z) = MCerrors(linear_prof_RZ, log_prof_RZ,
-                              totRealizations, ii, genTable_Z, theta_Z, label='Z', mode='BS')
+                              totRealizations, ii, genTable_Z_BS, theta_Z, label='Z', mode='BS')
   #
   elif (mode == "sigma") | (mode == "all"):
     print "\nFinding BS errors for Sigma map"
+    genTable_sigma_BS = genTable_sigma.copy()
     (BS_radial_lin_errm_sigma, BS_radial_lin_errp_sigma,
       BS_radial_lin_median_sigma, BS_n_elements_lin_sigma,
       BS_radial_log_errm_sigma, BS_radial_log_errp_sigma,
       BS_radial_log_median_sigma, BS_n_elements_log_sigma) = MCerrors(linear_prof_Rsigma, log_prof_Rsigma,
-                              totRealizations, ii, genTable_sigma, theta_sigma, label='sigma', mode='BS')
+                              totRealizations, ii, genTable_sigma_BS, theta_sigma, label='sigma', mode='BS')
 
 # '''
 # Computing the error via Monte Carlo simulation on the actual data points values
@@ -362,11 +386,12 @@ for ii in listGalaxiesToRun:
   totRealizations = 1000
   if (mode == "CaT") | (mode == "all"):
     print "\nFinding MC errors for CaT map"
+    genTable_CaT_MC = genTable_CaT.copy()
     (MC_radial_lin_errm_CaT, MC_radial_lin_errp_CaT,
       MC_radial_lin_median_CaT, MC_n_elements_lin_CaT,
       MC_radial_log_errm_CaT, MC_radial_log_errp_CaT,
       MC_radial_log_median_CaT, MC_n_elements_log_CaT) = MCerrors(linear_prof_RCaT, log_prof_RCaT,
-              totRealizations, ii, genTable_CaT, theta_CaT, label='CaT', mode='MC')
+              totRealizations, ii, genTable_CaT_MC, theta_CaT, label='CaT', mode='MC')
   #
   elif (mode == "SN") | (mode == "all"):
     print "\nFinding MC errors for S/N map"
@@ -377,19 +402,22 @@ for ii in listGalaxiesToRun:
   #
   elif (mode == "Z") | (mode == "all"):
     print "\nFinding MC errors for [Z/H] map"
+    genTable_Z_MC = genTable_Z.copy()
     (MC_radial_lin_errm_Z, MC_radial_lin_errp_Z,
       MC_radial_lin_median_Z, MC_n_elements_lin_Z,
       MC_radial_log_errm_Z, MC_radial_log_errp_Z,
       MC_radial_log_median_Z, MC_n_elements_log_Z) = MCerrors(linear_prof_RZ, log_prof_RZ,
-                              totRealizations, ii, genTable_Z, theta_Z, label='Z', mode='MC')
+                              totRealizations, ii, genTable_Z_MC, theta_Z, label='Z', mode='MC',
+                              realErrors = [errmZ_sel, errpZ_sel]) # Because errors on Z are asymmetrical
   #
   elif (mode == "sigma") | (mode == "all"):
     print "\nFinding MC errors for Sigma map"
+    genTable_sigma_MC = genTable_sigma.copy()
     (MC_radial_lin_errm_sigma, MC_radial_lin_errp_sigma,
       MC_radial_lin_median_sigma, MC_n_elements_lin_sigma,
       MC_radial_log_errm_sigma, MC_radial_log_errp_sigma,
       MC_radial_log_median_sigma, MC_n_elements_log_sigma) = MCerrors(linear_prof_Rsigma, log_prof_Rsigma,
-                              totRealizations, ii, genTable_sigma, theta_sigma, label='sigma', mode='MC')
+                              totRealizations, ii, genTable_sigma_MC, theta_sigma, label='sigma', mode='MC')
 
   #
   # SAVING PROFILES AND ERRORS

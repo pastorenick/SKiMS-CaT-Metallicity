@@ -57,14 +57,14 @@ def runOnGalaxy(listPar):
   #
   #
   print "DONE with "+ii+" in "+str(round((time.time() - time0)/60.,2))+" minutes."
-  os.remove(listPar[1][:-25]+'/inProgress')
+ # os.remove(listPar[1][:-25]+'/inProgress')
   # Create flag file (work done)
-  open(listPar[1][:-25]+'/done', 'a').close()
+ # open(listPar[1][:-25]+'/done', 'a').close()
   #
   return True
 #IF ERRORS OCCURED
  except:
-  os.remove(listPar[1][:-25]+'/inProgress')
+  #os.remove(listPar[1][:-25]+'/inProgress')
   #
   return False
 
@@ -73,7 +73,10 @@ def runOnGalaxy(listPar):
 ########
 
 def mainRun():
-  galnames = glob.glob('NGC*')
+  listDirectories = glob.glob('NGC*'); galnames = []
+  for ii in listDirectories:
+    if not('old' in ii):
+      galnames.append(ii)
   dicPathInput = {}
   pathNick = os.getcwd()
   #

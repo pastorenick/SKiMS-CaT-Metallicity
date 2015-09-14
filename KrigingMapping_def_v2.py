@@ -215,6 +215,7 @@ def KrigingR(pathInput, theta_r = 10., coeff_r = 3.,
 
 
 def getAverageDistance(xx, yy, errz=[]): #returns the average distance between the points, weighted by their error
+  #
   distances, weights = [], []
   if errz != []:
     for ii in range(len(xx)):
@@ -309,7 +310,10 @@ def KrigingMapPython(inputPath, namegal, genTable, label='Z', limits=[-3, +2], v
     elif label == 'SN':
       cb.set_label('S/N')
     elif label == 'sigma':
-      cb.set_label(r"$\rm{\sigma ~\left[ km/s\right]}$")
+      try:
+        cb.set_label(r"$\rm{\sigma}$ [km/s]")
+      except:
+        cb.set_label("Vel dispersion [km/s]")
     elif label == 'Vel':
       cb.set_label(r"Vel [km/s]")
     ax.set_title(namegal)
@@ -335,7 +339,7 @@ def findDell(RA, Dec, PA0, b_a):
   Rell = numpy.sqrt(b_a*(xrot**2)+(yrot**2)/b_a)
   #
   return Rell
-
+ 
 
 def radialProfile(namegal, inputFile, label='Z', #binsize=50,  #Bin numerosity 
                   binsize=1, #Bin size in arcsec
@@ -382,8 +386,6 @@ def radialProfile(namegal, inputFile, label='Z', #binsize=50,  #Bin numerosity
       binZ.append(numpy.average(tmpZ, weights=1./(numpy.array(tmperrZ)**2.)))
 #
   return binR, binZ
-
-
 
 
 
